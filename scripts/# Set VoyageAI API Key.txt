@@ -1,0 +1,5 @@
+# Set VoyageAI API Key
+set_env_securely("VOYAGE_API_KEY", "Enter your VoyageAI API key: ")
+
+
+4fcf14a3c2c04dc68f1fa4d57f53aeb5
