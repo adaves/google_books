@@ -40,16 +40,26 @@ def load_data() -> pd.DataFrame:
     except Exception as e:
         raise Exception(f"An error occurred: {e}")
     
-    df['PublishedDate'] = pd.to_datetime(df["PublishedDate"])
-    df['PublishedDate_Year'] = df['PublishedDate'].dt.year
+    # Convert to datetime and then to string format
+    df['PublishedDate'] = pd.to_datetime(df["PublishedDate"]).dt.strftime('%Y-%m-%d')
+    df['PublishedDate_Year'] = pd.to_datetime(df["PublishedDate"]).dt.year
     return df
 
 def create_table():
 # Create a table
     books_db = cursor.execute('''CREATE TABLE IF NOT EXISTS books (
                     id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                    title TEXT, 
-                    author TEXT, 
+                    title TEXT NOT NULL, 
+                    authors TEXT, 
+                    publisher TEXT, 
+                    published_date TEXT,
+                    isbn TEXT,
+                    page_count INTEGER,
+                    categories TEXT,
+                    average_rating FLOAT,
+                    ratings_count INTEGER,
+                    language TEXT,
+                    title_word_count INTEGER,
                     year INTEGER
                     )''')
     connection.commit()
@@ -62,11 +72,11 @@ def insert_data_into_db(df, database):
 
     try:
         # Convert dataframe to list of tuples for fast insertion
-        records = df[['Title', 'Authors', 'PublishedDate_Year']].values.tolist()
+        records = df[['Title', 'Authors', 'Publisher', 'PublishedDate', 'ISBN', 'PageCount', 'Categories', 'AverageRating', 'RatingsCount', 'Language', 'TitleWordCount', 'PublishedDate_Year']].values.tolist()
 
         insert_query = '''
-            INSERT INTO books (title, author, year)
-            VALUES (?, ?, ?)
+            INSERT INTO books (title, authors, publisher, published_date, isbn, page_count, categories, average_rating, ratings_count, language, title_word_count, year)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         '''
         cursor.executemany(insert_query, records)
         connection.commit()
@@ -77,14 +87,61 @@ def insert_data_into_db(df, database):
         print(f'Error inserting data: {str(e)}')
         connection.rollback()
 
-def get_data_from_db():
+def higher_than_average_rating():
+    query = """
+        SELECT title, average_rating
+        FROM books
+        WHERE average_rating > (
+            SELECT AVG(average_rating)
+            FROM books
+            WHERE average_rating IS NOT NULL
+        )
+        ORDER BY average_rating DESC
+        LIMIT 5
+    
+    """
+    return cursor.execute(query).fetchall()
 
-    # cursor.execute("SELECT * FROM books")
-    existing_data = cursor.execute("SELECT * FROM books").fetchall()
-    print("Existing IDs:", existing_data)
+def longer_than_avg_book_in_category():
+    query = """
+        SELECT
+            title,
+            categories,
+            page_count
+        FROM books AS b1
+        WHERE page_count > (
+            SELECT AVG(page_count)
+            FROM books AS b2
+            WHERE b2.categories = b1.categories AND page_count IS NOT NULL
+        )
+        ORDER BY page_count DESC
+        LIMIT 5;
+    """
+    return cursor.execute(query).fetchall()
 
-def clear_db():
-    pass
+def authors_with_longer_than_avg_books():
+    query = """
+        SELECT
+            DISTINCT(authors)
+        FROM books
+        WHERE page_count > (
+            SELECT AVG(page_count)
+            FROM books
+        )
+        AND authors IS NOT NULL
+        LIMIT 5;
+    """
+    return cursor.execute(query).fetchall()
+
+def print_results(results, query_name):
+    """
+    print query results in a formatted way
+    """
+    print(f"\n{query_name} results:")
+    print("-" * 50)
+    for row in results:
+        print(f"> {' | '.join(str(item) for item in row)}")
+    print("-" * 50)
 
 
 if __name__ == "__main__":
@@ -93,4 +150,7 @@ if __name__ == "__main__":
 
     df = load_data()
     insert_data_into_db(df, books_db)
-    get_data_from_db()
+
+    print_results(higher_than_average_rating(), "Higher than average rating")
+    print_results(longer_than_avg_book_in_category(), "Longer than average books by category")
+    print_results(authors_with_longer_than_avg_books(), "Authors of longer than average books")
