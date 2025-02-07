@@ -66,8 +66,6 @@ def create_table():
 
     return books_db
     
-    
-
 def insert_data_into_db(df, database):
 
     try:
@@ -98,7 +96,6 @@ def higher_than_average_rating():
         )
         ORDER BY average_rating DESC
         LIMIT 5
-    
     """
     return cursor.execute(query).fetchall()
 
@@ -133,6 +130,45 @@ def authors_with_longer_than_avg_books():
     """
     return cursor.execute(query).fetchall()
 
+def top_rated_books_each_category():
+    query = """
+        SELECT
+            DISTINCT(categories),
+            title,
+            MAX(average_rating) AS top_rated
+        FROM books
+        WHERE ratings_count > 5
+        ORDER BY categories;
+    """
+    return cursor.execute(query).fetchall()
+
+def publisher_data():
+    query = """
+        SELECT
+            publisher,
+            COUNT(*) AS num_books,
+            AVG(page_count) AS average_page_count,
+            MAX(average_rating) AS highest_rated
+        FROM books
+        GROUP BY publisher
+        HAVING COUNT(*) >= 3
+        ORDER BY num_books DESC;
+    """
+    return cursor.execute(query).fetchall()
+
+def compare_books_published_same_year():
+    query = """
+        SELECT
+            title,
+            year,
+            average_rating,
+            AVG(average_rating) OVER(PARTITION BY year) AS year_avg_rating
+        FROM books
+        ORDER BY year DESC, average_rating DESC
+        LIMIT 10;
+    """
+    return cursor.execute(query).fetchall()
+
 def print_results(results, query_name):
     """
     print query results in a formatted way
@@ -151,6 +187,6 @@ if __name__ == "__main__":
     df = load_data()
     insert_data_into_db(df, books_db)
 
-    print_results(higher_than_average_rating(), "Higher than average rating")
-    print_results(longer_than_avg_book_in_category(), "Longer than average books by category")
-    print_results(authors_with_longer_than_avg_books(), "Authors of longer than average books")
+    print_results(top_rated_books_each_category(), "Top rated books in each category")
+    print_results(publisher_data(), "Publisher Data")
+    print_results(compare_books_published_same_year(), "Compare books published in the same year")
